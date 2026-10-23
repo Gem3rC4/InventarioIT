@@ -15,7 +15,9 @@ param(
     [string]$TenantId,
     [string]$ClientId,
     [string]$ConfigPath = (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'InventarioEquipos\servidor.config.json'),
-    [switch]$PrepararRed
+    [switch]$PrepararRed,
+    # Incluye el perfil Publico en la regla (sigue limitada a la subred local, IP y puerto).
+    [switch]$PermitirRedPublica
 )
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
@@ -36,7 +38,7 @@ function New-ReceiverKey {
 }
 
 function Invoke-ReceiverSetup {
-    param([string]$ExcelUrl,[string]$Tabla,[string]$DireccionIP,[int]$Puerto,[string]$TenantId,[string]$ClientId,[string]$ConfigPath,[switch]$PrepararRed)
+    param([string]$ExcelUrl,[string]$Tabla,[string]$DireccionIP,[int]$Puerto,[string]$TenantId,[string]$ClientId,[string]$ConfigPath,[switch]$PrepararRed,[switch]$PermitirRedPublica)
     if ($env:OS -ne 'Windows_NT') { throw 'Ejecute el configurador en el equipo Windows central.' }
     if ($PrepararRed) {
         $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -106,16 +108,27 @@ function Invoke-ReceiverSetup {
             throw $message
         }
         $ruleName = 'InventarioIT-Central-{0}' -f $Puerto
+        $profiles = if ($PermitirRedPublica) { @('Domain','Private','Public') } else { @('Domain','Private') }
         $existingRule = Get-NetFirewallRule -Name $ruleName -ErrorAction SilentlyContinue
         if (-not $existingRule) {
-            $null = New-NetFirewallRule -Name $ruleName -Group 'InventarioIT' -DisplayName ('Inventario IT central - puerto ' + $Puerto) -Direction Inbound -Action Allow -Protocol TCP -LocalAddress $DireccionIP -LocalPort $Puerto -RemoteAddress LocalSubnet -Profile Domain,Private
+            $null = New-NetFirewallRule -Name $ruleName -Group 'InventarioIT' -DisplayName ('Inventario IT central - puerto ' + $Puerto) -Direction Inbound -Action Allow -Protocol TCP -LocalAddress $DireccionIP -LocalPort $Puerto -RemoteAddress LocalSubnet -Profile $profiles
         } else {
             if ([string]$existingRule.Group -ne 'InventarioIT') { throw 'Existe una regla con el mismo nombre que no pertenece a InventarioIT. Su administrador debe revisarla; no se modifico.' }
-            $null = Set-NetFirewallRule -Name $ruleName -Enabled True -Direction Inbound -Action Allow -Profile Domain,Private
+            $null = Set-NetFirewallRule -Name $ruleName -Enabled True -Direction Inbound -Action Allow -Profile $profiles
             $existingRule | Get-NetFirewallPortFilter | Set-NetFirewallPortFilter -Protocol TCP -LocalPort $Puerto | Out-Null
             $existingRule | Get-NetFirewallAddressFilter | Set-NetFirewallAddressFilter -LocalAddress $DireccionIP -RemoteAddress LocalSubnet | Out-Null
             Write-Host 'Se actualizo la regla de InventarioIT para esta IP y la subred local.'
         }
+        $networkCategory = $null
+        try {
+            $ipInfo = @(Get-NetIPAddress -IPAddress $DireccionIP -ErrorAction Stop)[0]
+            $networkCategory = [string](Get-NetConnectionProfile -InterfaceIndex $ipInfo.InterfaceIndex -ErrorAction Stop).NetworkCategory
+        } catch { $networkCategory = $null }
+        if ($networkCategory -eq 'Public' -and -not $PermitirRedPublica) {
+            Write-Warning ("Windows marca la red de $DireccionIP como Publica y la regla no se aplica a ese perfil: los demas equipos no podran conectarse.`n" +
+                "Repita la preparacion agregando -PermitirRedPublica, o ejecute como administrador:`n" +
+                "Set-NetFirewallRule -Name $ruleName -Profile Domain,Private,Public")
+        } elseif ($networkCategory) { Write-Host ('Perfil de red del central: {0}. Regla de firewall: {1}.' -f $networkCategory,($profiles -join ', ')) }
     }
     Write-Host "Configuracion del central: $ConfigPath" -ForegroundColor Green
     Write-Host "Comando para los equipos: $commandPath" -ForegroundColor Green

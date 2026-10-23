@@ -17,7 +17,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Configurar-Servidor.ps
 
 El configurador detecta la IP privada del central y solicita el enlace completo del Excel. Si detecta varias direcciones, le pide elegir una. También puede indicar `-DireccionIP '192.168.1.10'`. Si el libro tiene varias tablas, agregue `-Tabla 'NombreReal'`; con una sola tabla, se detecta automáticamente.
 
-`-PrepararRed` crea una reserva HTTP para el usuario del receptor y una regla de firewall limitada a la IP y puerto elegidos, la subred local y los perfiles Dominio/Privado. No cambia el perfil de red. Si la red de Windows figura como Pública, la regla no habilita acceso; su administrador debe revisar el perfil apropiado. Sin `-PrepararRed` se generan únicamente los archivos locales.
+`-PrepararRed` crea una reserva HTTP para el usuario del receptor y una regla de firewall limitada a la IP y puerto elegidos, la subred local y los perfiles Dominio/Privado. No cambia el perfil de red. Si la red de Windows del central figura como **Pública**, la regla no se aplica y los demás equipos reciben *"Se excedió el tiempo de espera"*; el configurador lo avisa. En ese caso agregue `-PermitirRedPublica`, que incluye también el perfil Público y mantiene la regla limitada a la IP, el puerto y la subred local. Sin `-PrepararRed` se generan únicamente los archivos locales.
 
 La reserva se comprueba por el prefijo y el identificador de seguridad (SID) del usuario, que `netsh` no traduce, así que funciona con Windows en español o inglés. Si no existe, se crea para ese SID; si ya pertenece al usuario, se conserva. Si pertenece a otra cuenta, no se modifica y el mensaje indica cómo usar otro puerto (`-Puerto`) o eliminar esa reserva.
 
