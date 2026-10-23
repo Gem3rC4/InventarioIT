@@ -13,7 +13,10 @@ param(
     [string]$ListenUri,
     [string]$QueueDirectory,
     [ValidateRange(1,1000)][int]$MaxPending = 1000,
-    [switch]$InstalarDependencias
+    # Se conserva por compatibilidad; ya no se instala ningun modulo.
+    [switch]$InstalarDependencias,
+    # Ignora la sesion de Microsoft guardada y pide un codigo nuevo.
+    [switch]$NuevaSesion
 )
 
 function Get-InventoryServerValue {
@@ -238,7 +241,7 @@ function Invoke-InventoryQueueWorker {
         Write-InventoryQueueItem $selected.FullName $item
         $attempted=$true
         if ($null -ne $Sender) { $response = & $Sender ($Destination.TableUri + '/rows/add') $body }
-        else { $response = Invoke-MgGraphRequest -Method POST -Uri ($Destination.TableUri + '/rows/add') -Body $body -ContentType 'application/json; charset=utf-8' -OutputType PSObject -ErrorAction Stop }
+        else { $response = Invoke-InventarioGraphRequest -Method POST -Uri ($Destination.TableUri + '/rows/add') -Body $body }
         $index = Get-InventoryServerValue $response 'index'
         if ($null -eq $index -or $index -is [bool] -or $index -is [string] -or $index -isnot [ValueType] -or [double]$index -lt 0 -or [double]::IsNaN([double]$index) -or [double]::IsInfinity([double]$index) -or [double]$index -ne [math]::Floor([double]$index)) { throw 'Excel no devolvio confirmacion de la fila.' }
         $item.status='sent'; $item.rowIndex=$index; $item.sentAtUtc=[DateTime]::UtcNow.ToString('o')
@@ -339,7 +342,7 @@ function Receive-InventoryHttpRequest {
 function Start-InventoryServer {
     [CmdletBinding()]
     param([string]$ConfigPath,[string]$ListenUri,[string]$QueueDirectory,[ValidateRange(1,1000)][int]$MaxPending=1000,
-        [switch]$InstalarDependencias,[string]$HelperModulePath)
+        [switch]$InstalarDependencias,[switch]$NuevaSesion,[string]$HelperModulePath)
     Set-StrictMode -Version 2.0
     $ErrorActionPreference='Stop'
     if ($env:OS -ne 'Windows_NT') { throw 'El receptor debe ejecutarse en Windows PowerShell 5.1 o posterior.' }
@@ -367,18 +370,12 @@ function Start-InventoryServer {
         $queueLock=[IO.File]::Open($lockPath,[IO.FileMode]::OpenOrCreate,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
         Repair-InventoryQueue $QueueDirectory
         [Net.ServicePointManager]::SecurityProtocol=$previousTls -bor [Net.SecurityProtocolType]::Tls12
-        Initialize-GraphModule -Install:$InstalarDependencias
-        Import-Module Microsoft.Graph.Authentication -MinimumVersion 2.0.0 -ErrorAction Stop
-        $connect=@{ Scopes=@('Files.ReadWrite'); ContextScope='CurrentUser'; UseDeviceAuthentication=$true; NoWelcome=$true; ErrorAction='Stop' }
+        # Inicio de sesion propio (REST). No usa el modulo Microsoft.Graph, que falla en Windows PowerShell 5.1.
         $tenant=[string](Get-InventoryServerValue $config 'TenantId'); $client=[string](Get-InventoryServerValue $config 'ClientId')
-        if ($tenant) { $connect.TenantId=$tenant }; if ($client) { $connect.ClientId=$client }
+        $sessionCache=Join-Path ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($ConfigPath))) 'sesion-microsoft.dat'
         Write-Host 'Autentique SOLO el receptor con una cuenta que pueda editar el Excel.' -ForegroundColor Cyan
-        $null=Connect-MgGraph @connect
-        $graphContext=Get-MgContext
-        if ((Get-InventoryServerValue $graphContext 'AuthType') -ne 'Delegated') { throw 'Se requiere una sesion delegada de Microsoft Graph.' }
-        $saved=Get-MgRequestContext
-        $previousContext=@{ MaxRetry=[int]$saved.MaxRetry; ClientTimeout=[int]$saved.ClientTimeout.TotalSeconds }
-        $null=Set-MgRequestContext -MaxRetry 0 -ClientTimeout 120
+        Connect-InventarioGraph -TenantId $tenant -ClientId $client -CachePath $sessionCache -NuevaSesion:$NuevaSesion
+        Write-Host 'Comprobando el Excel y su tabla...'
         $destination=Get-ExcelDestination -Url $excelUrl -TableName ([string](Get-InventoryServerValue $config 'Tabla'))
         $resolveDestination = { Get-ExcelDestination -Url $excelUrl -TableName ([string](Get-InventoryServerValue $config 'Tabla')) }
         $listener=New-Object Net.HttpListener
@@ -407,11 +404,10 @@ function Start-InventoryServer {
         }
     } finally {
         if ($null -ne $listener) { try { $listener.Stop(); $listener.Close() } catch {} }
-        if ($previousContext) { try { $null=Set-MgRequestContext -MaxRetry $previousContext.MaxRetry -ClientTimeout $previousContext.ClientTimeout } catch {} }
         if ($null -ne $queueLock) { $queueLock.Dispose() }
         [Net.ServicePointManager]::SecurityProtocol=$previousTls
-        # CurrentUser conserva la cache protegida de MSAL en el receptor. No se exportan tokens.
-        # Para retirar la sesion del receptor, use Disconnect-MgGraph de forma explicita.
+        # La sesion queda en sesion-microsoft.dat, cifrada con DPAPI para esta cuenta de Windows.
+        # Para cerrarla, inicie con -NuevaSesion o elimine ese archivo.
     }
 }
 

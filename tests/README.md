@@ -6,9 +6,10 @@ Ejecute desde la raiz del proyecto, con Windows PowerShell 5.1:
 powershell.exe -NoProfile -File .\tests\Probar-Cliente.ps1
 powershell.exe -NoProfile -File .\tests\Probar-Receptor.ps1
 powershell.exe -NoProfile -File .\tests\Probar-Configurador.ps1
+powershell.exe -NoProfile -File .\tests\Probar-Sesion.ps1
 ```
 
-Cliente: 11 pruebas. Receptor: 17 pruebas. Configurador: 11 pruebas (interpretacion de reservas HTTP de `netsh` en espanol e ingles y sintaxis de los scripts). Usan datos sinteticos y respuestas simuladas, sin iniciar sesion ni escribir en Excel real. Cubren la solicitud estable, el transporte, autenticacion de recepcion, cola durable, deduplicacion y confirmaciones.
+Cliente: 11 pruebas. Receptor: 17 pruebas. Configurador: 11 pruebas (interpretacion de reservas HTTP de `netsh` en espanol e ingles y sintaxis de los scripts). Sesion: 8 pruebas (inicio de sesion de Microsoft con codigo de dispositivo, sesion guardada cifrada y renovacion del token). Usan datos sinteticos y respuestas simuladas, sin iniciar sesion ni escribir en Excel real. Cubren la solicitud estable, el transporte, autenticacion de recepcion, cola durable, deduplicacion y confirmaciones.
 
 En un entorno con un directorio temporal virtualizado que impida renombrar archivos, indique una carpeta escribible propia mediante `-TestRoot` a Probar-Receptor.ps1.
 

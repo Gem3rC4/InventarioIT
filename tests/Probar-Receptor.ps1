@@ -62,6 +62,7 @@ function New-TestDestination {
 }
 # Si el codigo intenta enviar de verdad, esta funcion hace fallar la prueba.
 function Invoke-MgGraphRequest { throw 'La suite no permite llamadas reales a Microsoft Graph.' }
+function Invoke-InventarioGraphRequest { throw 'La suite no permite llamadas reales a Microsoft Graph.' }
 try {
     Invoke-Test 'Clave Bearer correcta y rechaza faltantes, prefijos o clave distinta' {
         Assert-True (Test-InventoryApiKey ('Bearer '+$script:TestKey) $script:TestKey) 'Rechazo clave correcta.'

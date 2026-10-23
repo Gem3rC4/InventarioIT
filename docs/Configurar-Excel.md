@@ -17,7 +17,7 @@ Configure Serie, IP y Version como Texto para conservar ceros iniciales. Fecha c
 
 Aunque un vínculo Cualquiera permita editar anónimamente en el navegador, la API de Graph de SharePoint requiere autenticación. Por ello el receptor mantiene la conexión autorizada con Microsoft. `Files.ReadWrite` es un permiso delegado: si el tenant pide aprobación de administrador o bloquea el código de dispositivo, el administrador debe revisar esas políticas. La API de agregar filas a Excel no admite permisos de aplicación.
 
-Microsoft.Graph.Authentication se instala solo en el central. Windows PowerShell 5.1 requiere .NET Framework 4.7.2 o posterior y PowerShellGet actualizado. El SDK conserva su caché en el contexto CurrentUser y puede renovar tokens; las políticas, revocación o reinicios pueden hacer que vuelva a solicitar acceso en ese equipo. Los clientes no reciben ese token ni una contraseña de Microsoft.
+El receptor no usa el módulo Microsoft.Graph.Authentication (falla en Windows PowerShell 5.1). Inicia sesión con el flujo de código de dispositivo de Microsoft mediante REST, usando el cliente público de Microsoft Graph PowerShell, y guarda el token de renovación en `sesion-microsoft.dat`, cifrado con DPAPI para la cuenta de Windows del central. Renueva el token automáticamente; las políticas, una revocación o una sesión expirada pueden hacer que vuelva a pedir un código. Los clientes no reciben ese token ni una contraseña de Microsoft.
 
 El archivo Inventario-Graph.ps1 conserva la alternativa antigua de conexión directa desde cada computadora. No es el cliente recomendado para el requisito de enviar sin iniciar sesión; el comando generado por Configurar-Servidor.ps1 usa Inventario-Equipo.ps1.
 

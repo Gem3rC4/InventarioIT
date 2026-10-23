@@ -8,6 +8,7 @@ cola/
 *.csv
 *.xlsx
 *.log
+sesion-microsoft.dat
 *.zip
 !config.example.json
 !servidor.config.example.json

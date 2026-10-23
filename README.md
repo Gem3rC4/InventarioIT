@@ -27,7 +27,9 @@ La reserva se comprueba por el prefijo y el identificador de seguridad (SID) del
 & "$env:LOCALAPPDATA\InventarioEquipos\Iniciar-Servidor.cmd"
 ```
 
-La primera ejecución solicita instalar `Microsoft.Graph.Authentication` si falta. Puede pedir NuGet y confirmar PowerShell Gallery. Windows PowerShell 5.1 requiere .NET Framework 4.7.2 o posterior.
+No se instala ningún módulo. El receptor inicia sesión en Microsoft directamente, con código de dispositivo, sin el módulo `Microsoft.Graph.Authentication`, que en Windows PowerShell 5.1 falla con *"Error al escribir en un agente de escucha"*. La consola muestra la dirección y el código, abre el navegador y copia el código al portapapeles.
+
+La sesión se guarda en `%LOCALAPPDATA%\InventarioEquipos\sesion-microsoft.dat`, cifrada con DPAPI para esa cuenta de Windows. Al reiniciar el receptor se reutiliza y no pide un código nuevo mientras Microsoft la mantenga válida. Para iniciar con otra cuenta, agregue `-NuevaSesion` al iniciar el receptor o elimine ese archivo.
 
 **Solo en el central**, siga el código temporal de Microsoft e inicie sesión con una cuenta que pueda editar el Excel. Si aparece que se necesita aprobación del administrador de Microsoft 365, este debe revisar `Files.ReadWrite` delegado para Microsoft Graph PowerShell. El vínculo anónimo de Excel no reemplaza la autorización de Graph.
 
@@ -107,6 +109,7 @@ Las suites usan datos sintéticos y respuestas simuladas, sin iniciar sesión ni
 powershell.exe -NoProfile -File .\tests\Probar-Cliente.ps1
 powershell.exe -NoProfile -File .\tests\Probar-Receptor.ps1
 powershell.exe -NoProfile -File .\tests\Probar-Configurador.ps1
+powershell.exe -NoProfile -File .\tests\Probar-Sesion.ps1
 ```
 
 `tests/Probar-Inventario.ps1` verifica las funciones de la versión directa, conservada en `Inventario-Graph.ps1`. Ese archivo es la alternativa anterior y sí pide autenticación por computadora; el comando actual generado utiliza el cliente centralizado.

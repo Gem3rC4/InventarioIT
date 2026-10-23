@@ -8,7 +8,7 @@ El configurador no habilita recepción hasta iniciar el servidor. Al usar `-Prep
 
 El receptor debe ejecutarse como la misma cuenta Windows de la configuración. Las reservas nuevas conceden escucha al SID de esa cuenta y permiten iniciar sin elevar, siempre que tenga acceso a su configuración y cola. Si se reutiliza una reserva que depende de un grupo habilitado solo al elevar, deberá iniciar el receptor con esos mismos permisos.
 
-El central inicia sesión con Microsoft, comprueba el Excel y su tabla, y después abre la recepción. La conexión es delegada `Files.ReadWrite`, con caché CurrentUser local del SDK; puede requerir reautenticación por reinicio, revocación o políticas corporativas. No se distribuye ese token a los clientes.
+El central inicia sesión con Microsoft, comprueba el Excel y su tabla, y después abre la recepción. La conexión es delegada `Files.ReadWrite`, guardada en `sesion-microsoft.dat` y cifrada con DPAPI para esa cuenta de Windows; puede requerir reautenticación por reinicio, revocación o políticas corporativas. No se distribuye ese token a los clientes.
 
 ## Protocolo
 
@@ -26,7 +26,7 @@ Un solo proceso utiliza cada directorio de cola, protegido por un bloqueo de arc
 
 1. `queued`: guardado en el central; aún no insertado.
 2. Valida nuevamente el archivo y las 18 columnas.
-3. Persiste `inflight` antes de hacer una sola solicitud de inserción a Excel, con reintentos del SDK deshabilitados.
+3. Persiste `inflight` antes de hacer una sola solicitud de inserción a Excel, sin reintentos automáticos (solo se repite si Microsoft rechaza el token con 401, antes de ejecutar).
 4. `sent`: solo después de recibir el índice confirmado de la fila y guardar el recibo.
 5. `needs-review`: error de validación, error de inserción, confirmación incierta o reinicio con un envío en curso.
 
