@@ -51,6 +51,7 @@ Si una reserva existente no concede el permiso necesario, el configurador muestr
 ## Incidencias comunes
 
 - Cliente sin conexión: compruebe que el central está encendido, la ventana del receptor está abierta y aparece Receptor activo. Revise IP, puerto, perfil de red y firewall. Use una IP fija o reserva DHCP.
+- Cliente con "Se excedió el tiempo de espera" aunque el receptor está activo y la regla de Windows existe: probablemente hay un firewall de terceros. Compruébelo en el central con `Get-CimInstance -Namespace root/SecurityCenter2 -ClassName FirewallProduct`. Si aparece, por ejemplo, ESET Firewall, ese producto reemplaza al firewall de Windows y la regla `InventarioIT-Central-<puerto>` no tiene efecto. Cree en ese producto (o en su consola central, como ESET PROTECT) una regla **entrante TCP, puerto local del receptor, permitir, solo desde la subred local**.
 - `401`: revise que el comando o cliente.config.json usen la clave generada en ese central.
 - `409`: se reutilizó un ID con contenido diferente; no cambie los datos de una solicitud guardada.
 - `503`: la cola de pendientes está llena; reintente más tarde con el mismo archivo de solicitud.
