@@ -1,4 +1,2 @@
-* text=auto
-*.ps1 text eol=crlf
-*.md text eol=lf
-*.json text eol=lf
+# Preserve the uploaded line endings, including Windows PowerShell files.
+* -text
