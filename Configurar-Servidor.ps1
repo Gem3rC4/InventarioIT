@@ -56,7 +56,8 @@ function Invoke-ReceiverSetup {
     if (-not (Test-PrivateIPv4 $DireccionIP)) { throw 'Se requiere una IP privada IPv4 (10.x, 172.16-31.x o 192.168.x).' }
     if (-not $ExcelUrl) { $ExcelUrl = Read-Host 'Pegue el enlace completo del Excel de SharePoint' }
     Import-Module (Join-Path $PSScriptRoot 'Inventario.Funciones.psm1') -Force -ErrorAction Stop
-    $null = ConvertTo-SharingToken $ExcelUrl
+    $excelInfo = Get-ExcelUrlInfo $ExcelUrl
+    if ($excelInfo.Personal) { Write-Host 'Excel de OneDrive personal: el receptor iniciara sesion con una cuenta personal de Microsoft.' }
     $configDirectory = [IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($ConfigPath))
     $null = New-Item -ItemType Directory -Path $configDirectory -Force
     $key = $null

@@ -10,6 +10,15 @@ Equipo | Usuario | Marca | Modelo | Serie | Procesador | TipoEquipo | RAM_GB | D
 ```
 
 3. Copie el vínculo completo del archivo. El configurador lo guarda únicamente en servidor.config.json fuera del repositorio.
+
+## Excel en OneDrive personal
+
+También se admite un Excel de una cuenta personal de Microsoft (outlook.com, hotmail.com). Use cualquiera de estas direcciones como `-ExcelUrl`:
+
+- El enlace para compartir `https://1drv.ms/x/c/...`.
+- La dirección del navegador al abrir el archivo en Excel para la web: `https://excel.cloud.microsoft/open/onedrive/?docId=...&driveId=...`. Es la opción más directa, porque apunta al archivo sin resolver el enlace.
+
+El receptor detecta que es OneDrive personal e inicia sesión con el tenant `consumers`: entre con la cuenta personal dueña del archivo. Esto evita las políticas de la cuenta de empresa, pero el receptor debe ejecutarse en un equipo cuyo firewall acepte conexiones de la red local (un cortafuegos de terceros como ESET puede bloquearlas aunque exista la regla de Windows).
 4. Si hay más de una tabla, indique su nombre mediante `-Tabla` al configurar. Si hay una sola, se selecciona automáticamente.
 5. Inicie el receptor y siga el inicio de sesión por código de dispositivo que muestra Microsoft. Espere a ver Receptor activo.
 

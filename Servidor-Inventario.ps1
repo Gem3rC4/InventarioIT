@@ -360,7 +360,7 @@ function Start-InventoryServer {
     if ($apiKey.Length -lt 32 -or $apiKey.Length -gt 512 -or $apiKey -match '[\s\x00-\x1f\x7f]') { throw 'Configure una ApiKey aleatoria de al menos 32 caracteres en el archivo local o INVENTARIO_API_KEY.' }
     $excelUrl=[string](Get-InventoryServerValue $config 'ExcelUrl')
     if (-not $excelUrl) { throw 'Falta ExcelUrl en la configuracion del receptor.' }
-    $null=ConvertTo-SharingToken $excelUrl
+    $excelInfo=Get-ExcelUrlInfo $excelUrl
     $null=New-Item -ItemType Directory -Path $QueueDirectory -Force
     # Un solo receptor puede utilizar este directorio. El bloqueo se libera al terminar.
     $lockPath=Join-Path $QueueDirectory 'receptor.lock'
@@ -372,6 +372,8 @@ function Start-InventoryServer {
         [Net.ServicePointManager]::SecurityProtocol=$previousTls -bor [Net.SecurityProtocolType]::Tls12
         # Inicio de sesion propio (REST). No usa el modulo Microsoft.Graph, que falla en Windows PowerShell 5.1.
         $tenant=[string](Get-InventoryServerValue $config 'TenantId'); $client=[string](Get-InventoryServerValue $config 'ClientId')
+        # Excel en OneDrive personal: cuenta personal de Microsoft (outlook.com, hotmail.com...).
+        if (-not $tenant -and $excelInfo.Personal) { $tenant='consumers'; Write-Host 'Excel de OneDrive personal: inicie sesion con su cuenta personal de Microsoft.' -ForegroundColor Cyan }
         $sessionCache=Join-Path ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($ConfigPath))) 'sesion-microsoft.dat'
         Write-Host 'Autentique SOLO el receptor con una cuenta que pueda editar el Excel.' -ForegroundColor Cyan
         Connect-InventarioGraph -TenantId $tenant -ClientId $client -CachePath $sessionCache -NuevaSesion:$NuevaSesion

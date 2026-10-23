@@ -121,6 +121,38 @@ try {
         Assert-True $thrown 'Acepto un host distinto de Graph.'
         Assert-Equal (Get-Calls).Count 0 'Hizo una llamada externa.'
     }
+    Invoke-Test 'Reconoce Excel personal, direccion del navegador y SharePoint' {
+        $direct = Get-ExcelUrlInfo 'https://excel.cloud.microsoft/open/onedrive/?docId=ABCDEF0123456789%21s0123456789abcdef0123456789abcdef&driveId=ABCDEF0123456789'
+        Assert-Equal $direct.Kind 'Direct' 'No uso los identificadores del navegador.'
+        Assert-Equal $direct.ItemId 'ABCDEF0123456789!s0123456789abcdef0123456789abcdef' 'No decodifico docId.'
+        Assert-Equal $direct.DriveId 'ABCDEF0123456789' 'driveId.'
+        Assert-Equal $direct.Personal $true 'No detecto OneDrive personal.'
+        $share = Get-ExcelUrlInfo 'https://1drv.ms/x/c/abcdef0123456789/IQAAAAAAAAAAAAAAAAAAAAAAAAA?e=abc123'
+        Assert-Equal "$($share.Kind)/$($share.Personal)" 'Share/True' '1drv.ms debe ser enlace personal.'
+        $business = Get-ExcelUrlInfo 'https://contoso-my.sharepoint.com/:x:/g/personal/usuario_contoso_com/EjemploToken?e=abc'
+        Assert-Equal "$($business.Kind)/$($business.Personal)" 'Share/False' 'SharePoint no es cuenta personal.'
+        $thrown = $false
+        try { $null = Get-ExcelUrlInfo 'https://ejemplo.invalid/libro.xlsx' } catch { $thrown = $true }
+        Assert-True $thrown 'Acepto un sitio que no es de Microsoft.'
+    }
+    Invoke-Test 'Destino directo consulta las tablas del archivo sin usar shares' {
+        & $module {
+            $script:GraphUris = New-Object 'System.Collections.Generic.List[string]'
+            function script:Invoke-InventarioGraphRequest {
+                param([string]$Method='GET',[string]$Uri,[string]$Body)
+                $script:GraphUris.Add($Uri)
+                if ($Uri -match '/tables$') { return [pscustomobject]@{ value = @([pscustomobject]@{ id='{T1}'; name='Tabla1' }) } }
+                $i = 0
+                return [pscustomobject]@{ value = @(Get-InventoryFields | ForEach-Object { [pscustomobject]@{ name=$_; index=$i }; $i++ }) }
+            }
+        }
+        $destination = Get-ExcelDestination -Url 'https://excel.cloud.microsoft/open/onedrive/?docId=ABCDEF0123456789%21s0123&driveId=ABCDEF0123456789'
+        $uris = & $module { ,$script:GraphUris.ToArray() }
+        Assert-True ($uris[0] -in @('https://graph.microsoft.com/v1.0/drives/ABCDEF0123456789/items/ABCDEF0123456789!s0123/workbook/tables','https://graph.microsoft.com/v1.0/drives/ABCDEF0123456789/items/ABCDEF0123456789%21s0123/workbook/tables')) "Ruta de tablas incorrecta: $($uris[0])"
+        Assert-True (@($uris | Where-Object { $_ -match '/shares/' }).Count -eq 0) 'Uso shares con identificadores directos.'
+        Assert-Equal $destination.TableName 'Tabla1' 'No selecciono la unica tabla.'
+        Assert-Equal @($destination.Columns).Count 18 'Columnas.'
+    }
 } finally {
     $resolved = [IO.Path]::GetFullPath($script:TempRoot)
     if ([IO.Path]::GetFileName($resolved) -match '^InventarioIT-sesion-tests-[a-f0-9]{32}$') { Remove-Item -LiteralPath $resolved -Recurse -Force }

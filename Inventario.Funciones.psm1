@@ -340,18 +340,53 @@ function Get-GraphCollection {
     return $items.ToArray()
 }
 
+function Get-ExcelUrlInfo {
+    <#
+    Acepta un enlace para compartir (SharePoint, OneDrive, 1drv.ms) o la direccion del navegador
+    de Excel para la web (excel.cloud.microsoft/...?docId=...&driveId=...), que apunta directo al archivo.
+    Personal = OneDrive de una cuenta personal de Microsoft (inicia sesion con tenant "consumers").
+    #>
+    param([Parameter(Mandatory = $true)][string]$Url)
+    $uri = $null
+    if (-not [uri]::TryCreate($Url.Trim(), [UriKind]::Absolute, [ref]$uri) -or $uri.Scheme -ne 'https') { throw 'ExcelUrl debe ser un enlace HTTPS completo.' }
+    $query = @{}
+    foreach ($pair in $uri.Query.TrimStart('?').Split('&')) {
+        if (-not $pair) { continue }
+        $parts = $pair.Split(@('='), 2, [StringSplitOptions]::None)
+        $value = if ($parts.Count -gt 1) { [uri]::UnescapeDataString($parts[1].Replace('+', ' ')) } else { '' }
+        $query[[uri]::UnescapeDataString($parts[0]).ToLowerInvariant()] = $value
+    }
+    $hostName = $uri.Host.ToLowerInvariant()
+    $driveId = [string]$query['driveid']
+    $itemId = [string]$query['docid']
+    if ($hostName -match '(^|\.)cloud\.microsoft$' -and $driveId -and $itemId) {
+        if ($driveId -notmatch '^[A-Za-z0-9!_\-]+$' -or $itemId -notmatch '^[A-Za-z0-9!_\-]+$') { throw 'La direccion de Excel tiene identificadores no validos.' }
+        return [pscustomobject]@{ Kind = 'Direct'; DriveId = $driveId; ItemId = $itemId; Personal = ($itemId.Contains('!') -or $uri.AbsolutePath -match '/onedrive') }
+    }
+    if ($hostName -match '(^|\.)sharepoint\.com$') { return [pscustomobject]@{ Kind = 'Share'; DriveId = $null; ItemId = $null; Personal = $false } }
+    if ($hostName -in @('1drv.ms', 'onedrive.live.com')) { return [pscustomobject]@{ Kind = 'Share'; DriveId = $null; ItemId = $null; Personal = $true } }
+    throw 'ExcelUrl debe ser un enlace de SharePoint/OneDrive (1drv.ms) o la direccion de Excel para la web (excel.cloud.microsoft) con docId y driveId.'
+}
+
 function Get-ExcelDestination {
     param([string]$Url, [string]$TableName)
-    $token = ConvertTo-SharingToken $Url
-    try { $item = Invoke-InventarioGraphRequest -Method GET -Uri "https://graph.microsoft.com/v1.0/shares/$token/driveItem" }
-    catch { throw ('No se pudo abrir el Excel con la cuenta de Microsoft del central. Inicie sesion con una cuenta que pueda editarlo. ' + $_.Exception.Message) }
-    $remote = Get-OptionalProperty $item 'remoteItem'
-    if ($remote) { $item = $remote }
-    $itemId = [string](Get-OptionalProperty $item 'id')
-    $driveId = [string](Get-OptionalProperty (Get-OptionalProperty $item 'parentReference') 'driveId')
+    $urlInfo = Get-ExcelUrlInfo $Url
+    if ($urlInfo.Kind -eq 'Direct') {
+        $itemId = $urlInfo.ItemId
+        $driveId = $urlInfo.DriveId
+    } else {
+        $token = ConvertTo-SharingToken $Url
+        try { $item = Invoke-InventarioGraphRequest -Method GET -Uri "https://graph.microsoft.com/v1.0/shares/$token/driveItem" }
+        catch { throw ('No se pudo abrir el Excel con la cuenta de Microsoft del central. Inicie sesion con una cuenta que pueda editarlo, o use como ExcelUrl la direccion del navegador al abrir el Excel (excel.cloud.microsoft/...driveId=...). ' + $_.Exception.Message) }
+        $remote = Get-OptionalProperty $item 'remoteItem'
+        if ($remote) { $item = $remote }
+        $itemId = [string](Get-OptionalProperty $item 'id')
+        $driveId = [string](Get-OptionalProperty (Get-OptionalProperty $item 'parentReference') 'driveId')
+    }
     if (-not $itemId -or -not $driveId) { throw 'Graph no devolvio los identificadores del archivo. Abra el enlace con la cuenta que tiene permiso de edicion.' }
     $base = 'https://graph.microsoft.com/v1.0/drives/{0}/items/{1}/workbook' -f [uri]::EscapeDataString($driveId), [uri]::EscapeDataString($itemId)
-    $tables = @(Get-GraphCollection "$base/tables")
+    try { $tables = @(Get-GraphCollection "$base/tables") }
+    catch { throw ('No se pudo abrir el libro de Excel. Inicie sesion con la cuenta duena del archivo o con permiso de edicion. ' + $_.Exception.Message) }
     if ($TableName) {
         $matches = @($tables | Where-Object { $_.name -eq $TableName -or $_.id -eq $TableName })
     } else { $matches = $tables }
