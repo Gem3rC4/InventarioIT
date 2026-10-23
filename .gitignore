@@ -1,0 +1,7 @@
+config.local.json
+*.local.json
+*.csv
+*.xlsx
+*.log
+*.zip
+!config.example.json
