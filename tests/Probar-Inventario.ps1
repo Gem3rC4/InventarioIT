@@ -1,11 +1,11 @@
 ﻿#requires -Version 5.1
 <#
 .SYNOPSIS
-Pruebas sin dependencias, conexiones ni cambios en Excel, para PowerShell 5.1.
+Pruebas del modo Graph heredado, sin conexiones ni cambios en Excel, para PowerShell 5.1.
 #>
 [CmdletBinding()]
 param([string]$ScriptPath)
-if (-not $ScriptPath) { $ScriptPath = Join-Path (Split-Path (Split-Path $MyInvocation.MyCommand.Path -Parent) -Parent) 'Inventario-Equipo.ps1' }
+if (-not $ScriptPath) { $ScriptPath = Join-Path (Split-Path (Split-Path $MyInvocation.MyCommand.Path -Parent) -Parent) 'Inventario-Graph.ps1' }
 $ErrorActionPreference = 'Stop'
 . $ScriptPath
 $script:Passed = 0
