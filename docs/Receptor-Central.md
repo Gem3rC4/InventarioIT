@@ -4,9 +4,9 @@
 
 `Configurar-Servidor.ps1` genera servidor.config.json, cliente.config.json, Comando-Equipos.txt e Iniciar-Servidor.cmd en `%LOCALAPPDATA%\InventarioEquipos`. La cola se guarda en su subcarpeta `cola`, con un archivo GUID.json por solicitud. No publique estos archivos ni los copie al repositorio.
 
-El configurador no habilita recepción hasta iniciar el servidor. Al usar `-PrepararRed`, necesita privilegios de administrador para reservar exactamente la IP y el puerto en HTTP.sys y habilitarlos únicamente para la subred local en perfiles Dominio/Privado. No cambia perfiles ni reglas ajenas. Si hay una reserva para otra identidad o una regla con el mismo nombre que no pertenece a InventarioIT, se detiene para que el administrador la revise.
+El configurador no habilita recepción hasta iniciar el servidor. Al usar `-PrepararRed`, necesita privilegios de administrador para reservar exactamente la IP y el puerto en HTTP.sys y habilitarlos únicamente para la subred local en perfiles Dominio/Privado. No cambia perfiles ni reglas ajenas. `netsh http show urlacl` devuelve código 0 aunque la dirección no esté reservada, por eso el configurador busca el prefijo exacto en la salida y lee la línea `SDDL` para comparar el SID del usuario (ambos datos no se traducen). Si no hay reserva, la crea con `sddl=D:(A;;GX;;;<SID>)` y la verifica. Conserva una reserva que ya permita escuchar a ese SID. Si la reserva es de otra cuenta, falla la consulta o hay una regla de firewall ajena con el mismo nombre, se detiene sin reemplazarla.
 
-El receptor debe ejecutarse como la misma cuenta Windows de la configuración. No necesita mantenerse elevado después de reservar la URL, siempre que esa cuenta tenga acceso a su configuración y cola.
+El receptor debe ejecutarse como la misma cuenta Windows de la configuración. Las reservas nuevas conceden escucha al SID de esa cuenta y permiten iniciar sin elevar, siempre que tenga acceso a su configuración y cola. Si se reutiliza una reserva que depende de un grupo habilitado solo al elevar, deberá iniciar el receptor con esos mismos permisos.
 
 El central inicia sesión con Microsoft, comprueba el Excel y su tabla, y después abre la recepción. La conexión es delegada `Files.ReadWrite`, con caché CurrentUser local del SDK; puede requerir reautenticación por reinicio, revocación o políticas corporativas. No se distribuye ese token a los clientes.
 
@@ -33,6 +33,20 @@ Un solo proceso utiliza cada directorio de cola, protegido por un bloqueo de arc
 Los clientes ven `queued` mientras una solicitud está en curso. El central muestra `[sent]` o `[needs-review]` con el identificador, sin imprimir la clave ni los datos completos.
 
 No se reintentan automáticamente los envíos inciertos. Revise `Equipo` y `Fecha` en el Excel y el `lastError` del recibo. Conserve la cola para auditoría y deduplicación. El Excel de 18 columnas no contiene una clave única de operación, por lo que una respuesta perdida no permite demostrar por sí sola si se insertó o no.
+
+## Comprobación de la reserva HTTP
+
+Si la preparación se detiene, copie esta línea completa en la misma consola como administrador. Los puntos y coma separan las instrucciones. Muestra la identidad, el prefijo y los permisos de Windows, sin imprimir la clave ni el enlace del Excel:
+
+```powershell
+whoami; $rutaConfig = Join-Path $env:LOCALAPPDATA 'InventarioEquipos\servidor.config.json'; if (Test-Path -LiteralPath $rutaConfig) { $config = Get-Content -LiteralPath $rutaConfig -Raw | ConvertFrom-Json; $config.ListenUri; netsh http show urlacl "url=$($config.ListenUri)" } else { Write-Host "No se encontro la configuracion para este usuario en: $rutaConfig" }
+```
+
+`%LOCALAPPDATA%` pertenece a la cuenta que ejecuta PowerShell. Si al elevar escribió las credenciales de `Administrador`, la configuración se guarda en el perfil de Administrador aunque el script esté en el escritorio de otro usuario. Continúe con esa misma cuenta de Windows; la cuenta utilizada para editar el Excel puede ser diferente.
+
+Si `netsh` muestra solo el encabezado `Reservas de direcciones URL:` sin ninguna entrada, la dirección no está reservada. Las versiones anteriores del configurador confundían ese caso con una reserva de otra identidad; la versión actual la crea.
+
+Si una reserva existente no concede el permiso necesario, el configurador muestra el prefijo y la cuenta para que el administrador la revise. Puede elegir otro puerto con `-Puerto 8876`, una vez comprobado que está disponible. El configurador no elimina ni sustituye la reserva anterior. Si usa el preparador privado `Preparar-Central.ps1`, este descarga la versión actual del proyecto en cada ejecución.
 
 ## Incidencias comunes
 

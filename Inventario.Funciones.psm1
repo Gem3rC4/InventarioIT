@@ -218,4 +218,38 @@ function Initialize-GraphModule {
     Import-Module Microsoft.Graph.Authentication -MinimumVersion 2.0.0 -ErrorAction Stop
 }
 
+function Get-UrlAclState {
+    <#
+    Interpreta la salida de "netsh http show urlacl url=<prefijo>" sin depender del idioma.
+    Solo usa el prefijo y la linea SDDL, que no se traducen.
+    Devuelve: Missing (sin reserva), Owned (permite escuchar al SID) o Foreign (otra identidad).
+    #>
+    param([AllowNull()][string]$NetshOutput, [Parameter(Mandatory = $true)][string]$UrlPrefix, [Parameter(Mandatory = $true)][string]$Sid)
+    if ([string]::IsNullOrWhiteSpace($NetshOutput)) { return 'Missing' }
+    $prefix = $UrlPrefix.Trim().TrimEnd('/') + '/'
+    $lines = @($NetshOutput -split '\r?\n')
+    $found = $false
+    $sddl = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($line in $lines) {
+        $trimmed = $line.Trim()
+        # Linea "Reserved URL : http://..." o "Direccion URL reservada : http://...".
+        $lineUrl = $null
+        if ($trimmed -match '(https?://\S+)') { $lineUrl = $Matches[1].TrimEnd('/') + '/' }
+        if (-not $found) {
+            if ($lineUrl -and $lineUrl -ieq $prefix) { $found = $true }
+            continue
+        }
+        if ($lineUrl) { break }
+        if ($trimmed -match '^SDDL\s*:\s*(\S+)') { $sddl.Add($Matches[1]) }
+    }
+    if (-not $found) { return 'Missing' }
+    foreach ($descriptor in $sddl) {
+        foreach ($ace in [regex]::Matches($descriptor, '\(A;[^;]*;([^;]*);[^;]*;[^;]*;([^)]+)\)')) {
+            $rights = $ace.Groups[1].Value
+            if ($ace.Groups[2].Value -ieq $Sid -and ($rights -match 'GX' -or $rights -match 'GA')) { return 'Owned' }
+        }
+    }
+    return 'Foreign'
+}
+
 Export-ModuleMember -Function *

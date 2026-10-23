@@ -19,6 +19,8 @@ El configurador detecta la IP privada del central y solicita el enlace completo 
 
 `-PrepararRed` crea una reserva HTTP para el usuario del receptor y una regla de firewall limitada a la IP y puerto elegidos, la subred local y los perfiles Dominio/Privado. No cambia el perfil de red. Si la red de Windows figura como Pública, la regla no habilita acceso; su administrador debe revisar el perfil apropiado. Sin `-PrepararRed` se generan únicamente los archivos locales.
 
+La reserva se comprueba por el prefijo y el identificador de seguridad (SID) del usuario, que `netsh` no traduce, así que funciona con Windows en español o inglés. Si no existe, se crea para ese SID; si ya pertenece al usuario, se conserva. Si pertenece a otra cuenta, no se modifica y el mensaje indica cómo usar otro puerto (`-Puerto`) o eliminar esa reserva.
+
 3. Inicie el receptor:
 
 ```powershell
@@ -104,6 +106,7 @@ Las suites usan datos sintéticos y respuestas simuladas, sin iniciar sesión ni
 ```powershell
 powershell.exe -NoProfile -File .\tests\Probar-Cliente.ps1
 powershell.exe -NoProfile -File .\tests\Probar-Receptor.ps1
+powershell.exe -NoProfile -File .\tests\Probar-Configurador.ps1
 ```
 
 `tests/Probar-Inventario.ps1` verifica las funciones de la versión directa, conservada en `Inventario-Graph.ps1`. Ese archivo es la alternativa anterior y sí pide autenticación por computadora; el comando actual generado utiliza el cliente centralizado.

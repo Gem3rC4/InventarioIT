@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
 .SYNOPSIS
 Prepara el receptor central y genera el comando que ejecutaran los demas equipos.
@@ -80,17 +80,30 @@ function Invoke-ReceiverSetup {
     $cmdContent = "@echo off`r`nchcp 65001 >nul`r`n" + $startCommand + "`r`n"
     [IO.File]::WriteAllText((Join-Path $configDirectory 'Iniciar-Servidor.cmd'),$cmdContent,[Text.UTF8Encoding]::new($false))
     if ($PrepararRed) {
-        # Reserva especifica de IP/puerto para el usuario que ejecuta el receptor.
-        $account = [Security.Principal.WindowsIdentity]::GetCurrent().Name
-        $reservation = & netsh.exe http show urlacl ("url=$listenUri") 2>&1 | Out-String
-        if ($LASTEXITCODE -ne 0) {
-            $reservationResult = & netsh.exe http add urlacl ("url=$listenUri") ("user=$account") 'listen=yes'
-            if ($LASTEXITCODE -ne 0) { throw 'No se pudo reservar la direccion HTTP. Revise las reservas existentes con su administrador.' }
+        # Reserva HTTP.sys para el SID del usuario del receptor. "netsh show" devuelve codigo 0
+        # aunque no exista la reserva, por eso se interpreta la salida por prefijo y SDDL.
+        $receiverIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
+        try {
+            $account = $receiverIdentity.Name
+            $sid = $receiverIdentity.User.Value
+        } finally { $receiverIdentity.Dispose() }
+        Write-Host ('Preparando recepcion HTTP: {0} - usuario de Windows: {1}' -f $listenUri,$account)
+        $showOutput = & netsh.exe http show urlacl ("url=$listenUri") | Out-String
+        if ($LASTEXITCODE -ne 0) { throw ('No se pudo consultar la reserva HTTP de {0}. Detalle: {1}' -f $listenUri,$showOutput.Trim()) }
+        $reservationState = Get-UrlAclState -NetshOutput $showOutput -UrlPrefix $listenUri -Sid $sid
+        if ($reservationState -eq 'Missing') {
+            $addOutput = & netsh.exe http add urlacl ("url=$listenUri") ("sddl=D:(A;;GX;;;$sid)") | Out-String
+            if ($LASTEXITCODE -ne 0) { throw ('No se pudo reservar {0}. Detalle: {1}' -f $listenUri,$addOutput.Trim()) }
+            $verifyOutput = & netsh.exe http show urlacl ("url=$listenUri") | Out-String
+            if ((Get-UrlAclState -NetshOutput $verifyOutput -UrlPrefix $listenUri -Sid $sid) -ne 'Owned') { throw ('La reserva de {0} no quedo asignada a {1}. Revise: netsh http show urlacl url={0}' -f $listenUri,$account) }
+            Write-Host 'La reserva HTTP quedo creada para este usuario.' -ForegroundColor Green
+        } elseif ($reservationState -eq 'Owned') {
+            Write-Host 'La reserva HTTP ya pertenece al usuario del receptor; se conservo.'
         } else {
-            if ($reservation.IndexOf($account,[StringComparison]::OrdinalIgnoreCase) -lt 0) {
-                throw 'La direccion HTTP esta reservada para otra identidad. Su administrador debe revisar esa reserva; no se modifico.'
-            }
-            Write-Host 'La reserva HTTP ya pertenece al usuario del receptor.'
+            $message = "La direccion $listenUri ya esta reservada para otra cuenta de Windows y no se modifico.`n" +
+                "Opcion 1: use otro puerto, por ejemplo agregando -Puerto $($Puerto + 1).`n" +
+                "Opcion 2: si esa reserva es de una prueba anterior de InventarioIT, eliminela y repita: netsh http delete urlacl url=$listenUri"
+            throw $message
         }
         $ruleName = 'InventarioIT-Central-{0}' -f $Puerto
         $existingRule = Get-NetFirewallRule -Name $ruleName -ErrorAction SilentlyContinue
