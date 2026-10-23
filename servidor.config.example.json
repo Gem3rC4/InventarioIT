@@ -1,0 +1,9 @@
+{
+  "ExcelUrl": "",
+  "Tabla": "",
+  "TenantId": "",
+  "ClientId": "",
+  "ApiKey": "REEMPLAZAR_CON_LA_CLAVE_GENERADA_POR_CONFIGURAR_SERVIDOR",
+  "ListenUri": "http://192.168.1.10:8765/",
+  "QueueDirectory": "C:\\InventarioIT-Datos\\cola"
+}

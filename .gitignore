@@ -1,7 +1,13 @@
 config.local.json
 *.local.json
+*.config.json
+*.solicitud.json
+Comando-Equipos.txt
+Iniciar-Servidor.cmd
+cola/
 *.csv
 *.xlsx
 *.log
 *.zip
 !config.example.json
+!servidor.config.example.json
