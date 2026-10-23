@@ -77,13 +77,14 @@ function Invoke-ReceiverSetup {
     $clientCommand | Set-Content -LiteralPath $commandPath -Encoding UTF8
     $serverScript = Join-Path $PSScriptRoot 'Servidor-Inventario.ps1'
     $startCommand = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' + $serverScript + '" -ConfigPath "' + [IO.Path]::GetFullPath($ConfigPath) + '" -InstalarDependencias'
-    $startCommand | Set-Content -LiteralPath (Join-Path $configDirectory 'Iniciar-Servidor.cmd') -Encoding ASCII
+    $cmdContent = "@echo off`r`nchcp 65001 >nul`r`n" + $startCommand + "`r`n"
+    [IO.File]::WriteAllText((Join-Path $configDirectory 'Iniciar-Servidor.cmd'),$cmdContent,[Text.UTF8Encoding]::new($false))
     if ($PrepararRed) {
         # Reserva especifica de IP/puerto para el usuario que ejecuta el receptor.
         $account = [Security.Principal.WindowsIdentity]::GetCurrent().Name
         $reservation = & netsh.exe http show urlacl ("url=$listenUri") 2>&1 | Out-String
         if ($LASTEXITCODE -ne 0) {
-            & netsh.exe http add urlacl ("url=$listenUri") ("user=$account") 'listen=yes'
+            $reservationResult = & netsh.exe http add urlacl ("url=$listenUri") ("user=$account") 'listen=yes'
             if ($LASTEXITCODE -ne 0) { throw 'No se pudo reservar la direccion HTTP. Revise las reservas existentes con su administrador.' }
         } else {
             if ($reservation.IndexOf($account,[StringComparison]::OrdinalIgnoreCase) -lt 0) {
