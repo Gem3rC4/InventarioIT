@@ -243,12 +243,22 @@ function Get-UrlAclState {
         if ($trimmed -match '^SDDL\s*:\s*(\S+)') { $sddl.Add($Matches[1]) }
     }
     if (-not $found) { return 'Missing' }
+    # Windows abrevia algunas cuentas en el SDDL (LA = Administrador integrado, BU = Usuarios...).
+    # RawSecurityDescriptor convierte esas abreviaturas al SID real antes de comparar.
+    $allowed = $false
     foreach ($descriptor in $sddl) {
-        foreach ($ace in [regex]::Matches($descriptor, '\(A;[^;]*;([^;]*);[^;]*;[^;]*;([^)]+)\)')) {
-            $rights = $ace.Groups[1].Value
-            if ($ace.Groups[2].Value -ieq $Sid -and ($rights -match 'GX' -or $rights -match 'GA')) { return 'Owned' }
+        try { $acl = ([Security.AccessControl.RawSecurityDescriptor]::new($descriptor)).DiscretionaryAcl }
+        catch { continue }
+        if ($null -eq $acl) { continue }
+        foreach ($ace in $acl) {
+            if ($ace -isnot [Security.AccessControl.CommonAce] -or $ace.SecurityIdentifier.Value -ine $Sid) { continue }
+            # 0x20000000 = GX (escuchar), 0x10000000 = GA (todo).
+            if (($ace.AccessMask -band 0x30000000) -eq 0) { continue }
+            if ($ace.AceQualifier -eq [Security.AccessControl.AceQualifier]::AccessDenied) { return 'Foreign' }
+            if ($ace.AceQualifier -eq [Security.AccessControl.AceQualifier]::AccessAllowed) { $allowed = $true }
         }
     }
+    if ($allowed) { return 'Owned' }
     return 'Foreign'
 }
 

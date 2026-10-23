@@ -8,7 +8,7 @@ powershell.exe -NoProfile -File .\tests\Probar-Receptor.ps1
 powershell.exe -NoProfile -File .\tests\Probar-Configurador.ps1
 ```
 
-Cliente: 11 pruebas. Receptor: 17 pruebas. Configurador: 8 pruebas (interpretacion de reservas HTTP de `netsh` en espanol e ingles y sintaxis de los scripts). Usan datos sinteticos y respuestas simuladas, sin iniciar sesion ni escribir en Excel real. Cubren la solicitud estable, el transporte, autenticacion de recepcion, cola durable, deduplicacion y confirmaciones.
+Cliente: 11 pruebas. Receptor: 17 pruebas. Configurador: 11 pruebas (interpretacion de reservas HTTP de `netsh` en espanol e ingles y sintaxis de los scripts). Usan datos sinteticos y respuestas simuladas, sin iniciar sesion ni escribir en Excel real. Cubren la solicitud estable, el transporte, autenticacion de recepcion, cola durable, deduplicacion y confirmaciones.
 
 En un entorno con un directorio temporal virtualizado que impida renombrar archivos, indique una carpeta escribible propia mediante `-TestRoot` a Probar-Receptor.ps1.
 

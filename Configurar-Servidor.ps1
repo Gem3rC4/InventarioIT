@@ -95,7 +95,7 @@ function Invoke-ReceiverSetup {
             $addOutput = & netsh.exe http add urlacl ("url=$listenUri") ("sddl=D:(A;;GX;;;$sid)") | Out-String
             if ($LASTEXITCODE -ne 0) { throw ('No se pudo reservar {0}. Detalle: {1}' -f $listenUri,$addOutput.Trim()) }
             $verifyOutput = & netsh.exe http show urlacl ("url=$listenUri") | Out-String
-            if ((Get-UrlAclState -NetshOutput $verifyOutput -UrlPrefix $listenUri -Sid $sid) -ne 'Owned') { throw ('La reserva de {0} no quedo asignada a {1}. Revise: netsh http show urlacl url={0}' -f $listenUri,$account) }
+            if ((Get-UrlAclState -NetshOutput $verifyOutput -UrlPrefix $listenUri -Sid $sid) -ne 'Owned') { throw ("La reserva de {0} no quedo asignada a {1} (SID {2}). Salida de netsh:`n{3}" -f $listenUri,$account,$sid,$verifyOutput.Trim()) }
             Write-Host 'La reserva HTTP quedo creada para este usuario.' -ForegroundColor Green
         } elseif ($reservationState -eq 'Owned') {
             Write-Host 'La reserva HTTP ya pertenece al usuario del receptor; se conservo.'

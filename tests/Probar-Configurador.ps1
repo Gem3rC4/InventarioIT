@@ -59,6 +59,22 @@ Invoke-Test 'Otro prefijo en la salida no se confunde con el propio' {
     $out = New-Reservation 'Reserved URL' 'http://172.16.74.11:9999/' "D:(A;;GX;;;$sid)"
     Assert-Equal (Get-UrlAclState -NetshOutput $out -UrlPrefix $url -Sid $sid) 'Missing' 'Uso la reserva de otro puerto.'
 }
+Invoke-Test 'Alias LA del Administrador integrado se reconoce como propio' {
+    # Windows muestra "SDDL: D:(A;;GX;;;LA)" para la cuenta Administrador (RID 500) del equipo.
+    $localAdmin = ([Security.AccessControl.RawSecurityDescriptor]::new('D:(A;;GX;;;LA)')).DiscretionaryAcl[0].SecurityIdentifier.Value
+    Assert-Equal ($localAdmin -match '^S-1-5-21-.+-500$') $true 'LA no corresponde al RID 500.'
+    $out = New-Reservation ('Direcci' + [char]0x00F3 + 'n URL reservada') $url 'D:(A;;GX;;;LA)'
+    Assert-Equal (Get-UrlAclState -NetshOutput $out -UrlPrefix $url -Sid $localAdmin) 'Owned' 'No reconocio el alias LA.'
+    Assert-Equal (Get-UrlAclState -NetshOutput $out -UrlPrefix $url -Sid $otherSid) 'Foreign' 'Asigno LA a otra cuenta.'
+}
+Invoke-Test 'Alias de grupo BU se convierte a su SID' {
+    $out = New-Reservation 'Reserved URL' $url 'D:(A;;GX;;;BU)(A;;GX;;;LS)'
+    Assert-Equal (Get-UrlAclState -NetshOutput $out -UrlPrefix $url -Sid 'S-1-5-32-545') 'Owned' 'No convirtio BU.'
+}
+Invoke-Test 'Permiso sin escucha no cuenta como propio' {
+    $out = New-Reservation 'Reserved URL' $url "D:(A;;GR;;;$sid)"
+    Assert-Equal (Get-UrlAclState -NetshOutput $out -UrlPrefix $url -Sid $sid) 'Foreign' 'Acepto un permiso sin GX.'
+}
 Invoke-Test 'Configurador y preparador se analizan sin errores' {
     $root = Split-Path $ModulePath -Parent
     foreach ($file in @('Configurar-Servidor.ps1','Servidor-Inventario.ps1','Inventario-Equipo.ps1')) {
