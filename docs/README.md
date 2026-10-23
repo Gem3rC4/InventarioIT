@@ -1,3 +1,6 @@
 # Documentacion
 
-Consulte [Configurar Excel](Configurar-Excel.md) para preparar la tabla, iniciar sesion y revisar los permisos de Microsoft 365.
+- [Conexion del central con Excel](Configurar-Excel.md).
+- [Operacion, protocolo y recuperacion del receptor](Receptor-Central.md).
+
+Siga primero el README de la raiz para configurar el central y generar el comando de los clientes.
